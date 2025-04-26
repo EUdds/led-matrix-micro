@@ -21,5 +21,6 @@ typedef enum
 
 void display_manager_setPixel(uint32_t row, uint32_t col, uint32_t color);
 void display_manager_setBrightness(float brightness);
+void display_manager_clearScreen(void);
 
 void display_manager_task(void* pvParameter);

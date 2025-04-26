@@ -10,3 +10,4 @@ void neopixel_driver_setRawPixel(tNeopixel* pixel);
 void neopixel_driver_fill_matrix(uint32_t rgb);
 void neopixel_driver_setBrightness(float b);
 void neopixel_driver_setPixel(int index, uint32_t color);
+void neopixel_driver_clearMatrix(void);

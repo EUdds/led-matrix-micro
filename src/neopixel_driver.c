@@ -2,10 +2,12 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h" 
+#include "freertos/semphr.h"
 #include "driver/gpio.h"
 #include <neopixel.h>
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "utils.h"
 
 #ifndef NEOPIXEL_GPIO
 #define NEOPIXEL_GPIO (GPIO_NUM_27)
@@ -24,8 +26,6 @@
 #define LOGD(...) ESP_LOGD(LOGGER_TAG, __VA_ARGS__)
 #define LOGW(...) ESP_LOGW(LOGGER_TAG, __VA_ARGS__)
 
-#define MAX(x,y) ((x) > (y) ? (x) : (y))
-#define MIN(x,y) ((x) < (y) ? (x) : (y))
 
 #define BRIGHTNESS_SCALE 256
 #define MAX_BRIGHTNESS 200 // May need some tuneing
@@ -34,6 +34,7 @@
 
 static tNeopixel pixelBuffer[NEOPIXEL_NUM_LEDS] = {0};
 static QueueHandle_t pixelQueue = NULL;
+static SemaphoreHandle_t pixelMutex = NULL; // Mutex for pixel buffer access
 static tNeopixelContext neopixel = NULL;
 
 
@@ -56,6 +57,9 @@ static int neopixel_driver_init(void)
     refreshRate = MAX(1, pdMS_TO_TICKS( 1000UL/ refreshRate)); // Convert to milliseconds
     LOGI("NeoPixel refresh rate: %lu", pdTICKS_TO_MS(refreshRate));
     pixelQueue = xQueueCreate(QUEUE_BUFFER_SIZE, sizeof(tNeopixel));
+    pixelMutex = xSemaphoreCreateBinary();
+    xSemaphoreGive(pixelMutex); // Initialize the mutex to be available
+
     return 0;
 }
 
@@ -64,7 +68,9 @@ static void neopixel_driver_applyBrightness(tNeopixel* input, tNeopixel* output)
 {
     uint8_t bright = (uint8_t)(brightness * BRIGHTNESS_SCALE);
     bright = MIN(bright, MAX_BRIGHTNESS); // Ensure brightness does not exceed max
-    for (uint32_t i = 0; i < NEOPIXEL_NUM_LEDS; i++) {
+    xSemaphoreTake(pixelMutex, portMAX_DELAY); // Take the mutex to protect the pixel buffer
+    for (uint32_t i = 0; i < NEOPIXEL_NUM_LEDS; i++)
+    {
 
         uint8_t r = (input[i].rgb >> 16) & 0xFF;
         uint8_t g = (input[i].rgb >> 8) & 0xFF;
@@ -78,6 +84,7 @@ static void neopixel_driver_applyBrightness(tNeopixel* input, tNeopixel* output)
         output[i].rgb = (r << 16) | (g << 8) | b;
         output[i].index = input[i].index; // Keep the index the same
     }
+    xSemaphoreGive(pixelMutex); // Release the mutex
 }
 
 
@@ -111,7 +118,9 @@ void neopixel_driver_addToQueue(tNeopixel* pixel, uint32_t pixelCount)
 void neopixel_driver_setRawPixel(tNeopixel* pixel)
 {
     LOGI("Setting raw pixel: index=%lu, color=%06lX", pixel->index, pixel->rgb);
+    xSemaphoreTake(pixelMutex, portMAX_DELAY); // Take the mutex to protect the pixel buffer
     pixelBuffer[pixel->index] = *pixel;
+    xSemaphoreGive(pixelMutex); // Release the mutex
 }
 
 void neopixel_driver_setPixel(int index, uint32_t color)
@@ -120,16 +129,30 @@ void neopixel_driver_setPixel(int index, uint32_t color)
         LOGE("Index out of bounds: %d", index);
         return;
     }
+    xSemaphoreTake(pixelMutex, portMAX_DELAY); // Take the mutex to protect the pixel buffer
     pixelBuffer[index].rgb = color;
     pixelBuffer[index].index = index;
+    xSemaphoreGive(pixelMutex); // Release the mutex
 }
 
 void neopixel_driver_fill_matrix(uint32_t rgb)
 {
+    xSemaphoreTake(pixelMutex, portMAX_DELAY); // Take the mutex to protect the pixel buffer
     for (uint32_t i = 0; i < NEOPIXEL_NUM_LEDS; i++) {
         pixelBuffer[i].index = i;
         pixelBuffer[i].rgb = rgb;
     }
+    xSemaphoreGive(pixelMutex); // Release the mutex
+}
+
+void neopixel_driver_clearMatrix(void)
+{
+    xSemaphoreTake(pixelMutex, portMAX_DELAY); // Take the mutex to protect the pixel buffer
+    for (uint32_t i = 0; i < NEOPIXEL_NUM_LEDS; i++) {
+        pixelBuffer[i].index = i;
+        pixelBuffer[i].rgb = 0x000000; // Clear to black
+    }
+    xSemaphoreGive(pixelMutex); // Release the mutex
 }
 
 void neopixel_task(void* pvParameter)

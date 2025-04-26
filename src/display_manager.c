@@ -54,11 +54,15 @@ void display_manager_setPixel(uint32_t row, uint32_t col, uint32_t color)
     LOGI("Setting pixel at (%ld, %ld) to color %06lX (%lu)", row, col, color, pixelIndex);
 }
 
+void display_manager_clearScreen(void)
+{
+    neopixel_driver_clearMatrix();
+}
+
 void display_manager_task(void* pvParameter)
 {
     // Initialize the display manager
     display_manager_setBrightness(1.0f); // Set brightness to 100%
-    display_manager_setPixel(0, 0, 0xFF0000); // Set the first pixel to red
 
     while (1) {
         if (enablePotMonitoring) {

@@ -1,29 +1,7 @@
 #pragma once
 
-#include "fonts/5x3.h"
+#include "fonts.h"
 
-#include <stdint.h>
-
-typedef enum
-{
-    FONT_SIZE_5x3 = 0
-} font_size_E;
-
-
-typedef struct
-{
-    const uint8_t *bitmap; // Pointer to the bitmap data
-    uint8_t width;   // Width of the character in pixels
-    uint8_t height;  // Height of the character in pixels
-} font_t;
-
-
-const font_t font_5x3 = {
-    .bitmap = font_5x3_chars,
-    .width = 3,
-    .height = 5,
-};
-
-
-
-void font_getChar(char c, font_size_E size, uint8_t *bitmap, uint8_t *width, uint8_t *height);
+void graphics_drawChar(uint8_t x, uint8_t y, char c, font_size_E size, uint32_t color);
+void graphics_drawRectangle(uint8_t x, uint8_t y, uint8_t width, uint8_t height, uint32_t color);
+void graphics_drawLine(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint32_t color);
