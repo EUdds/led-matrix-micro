@@ -44,7 +44,7 @@ void font_getChar(char c, font_size_E size, uint8_t *bitmap, uint8_t *width, uin
     memcpy(bitmap, &chosenFont.bitmap[index], chosenFont.height);
     *width = chosenFont.width;
     *height = chosenFont.height;
-    LOGI("Font: %d, Width: %d, Height: %d", size, *width, *height);
+    LOGD("Font: %d, Width: %d, Height: %d", size, *width, *height);
 }
 
 void font_drawChar(uint8_t x, uint8_t y, char c, font_size_E size, uint32_t color)
@@ -60,6 +60,10 @@ void font_drawChar(uint8_t x, uint8_t y, char c, font_size_E size, uint32_t colo
             if (bitmap[row] & (1 << col))
             {
                 display_manager_setPixel(y + row, x + (width - col - 1),  color);
+            }
+            else
+            {
+                display_manager_setPixel(y + row, x + (width - col - 1), 0x000000); // Clear pixel
             }
         }
     }

@@ -3,6 +3,8 @@
 #define MAX(x,y) ((x) > (y) ? (x) : (y))
 #define MIN(x,y) ((x) < (y) ? (x) : (y))
 
+#define NUM_TO_CHAR(x) ((x) + '0')
+
 
 #define RED 0xFF0000
 #define GREEN 0x00FF00
