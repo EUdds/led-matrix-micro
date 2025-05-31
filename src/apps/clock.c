@@ -22,15 +22,6 @@
 
 #define TIMER_DIVIDER 80 // 80 MHz / 80 = 1 MHz
 
-typedef struct
-{
-    uint32_t hour;
-    uint32_t minute;
-    uint32_t second;
-    uint8_t month;
-    uint8_t day;
-    uint32_t year;
-} clock_datetime_t;
 
 
 static clock_datetime_t current_time = {0};
@@ -47,12 +38,12 @@ static bool IRAM_ATTR timer_on_alarm_cb(gptimer_handle_t timer, const gptimer_al
 
 bool fetch_time(clock_datetime_t* time)
 {
-    LOGD("Fetching time from server...");
+    LOGI("Fetching time from server...");
     char response[MAX_RESPONSE_LENGTH] = {0};
     size_t response_len = 0;
-    if (http_get("http://worldtimeapi.org/api/timezone/America/Los_Angeles", response, &response_len))
+    if (http_manager_httpGet("http://worldtimeapi.org/api/timezone/America/Los_Angeles", response, &response_len))
     {
-        LOGD("Response: %s", response);
+        LOGI("Response: %s", response);
         clock_datetime_t datetime = {0};
         char *datetime_field = strstr(response, "\"datetime\":\"");
         if (datetime_field) {
@@ -84,18 +75,71 @@ bool fetch_time(clock_datetime_t* time)
     }
 }
 
-clock_datetime_t get_current_time(void)
+bool get_current_time(clock_datetime_t* time)
 {
-    return current_time; // Return the current time
+    if (time == NULL || current_time.year == 0) {
+        return false;
+    }
+    // Copy the data that time points to, not the pointer itself
+    memcpy(time, &current_time, sizeof(clock_datetime_t));
+    return true;
 }
 
-clock_datetime_t get_current_time12(void)
+bool get_current_time12(clock_datetime_t* time)
 {
-    clock_datetime_t time = current_time;
-    if (time.hour > 12) {
-        time.hour -= 12; // Convert to 12-hour format
+    if (time == NULL || current_time.year == 0) {
+        LOGD("Current time is not set or NULL pointer passed");
+        return false;
     }
-    return time;
+    // Copy the data that time points to, not the pointer itself
+    memcpy(time, &current_time, sizeof(clock_datetime_t));
+    return true;
+}
+
+char clock_getHourTens12(void)
+{
+    if (current_time.hour > 12) {
+        return ((current_time.hour - 12) / 10) + '0'; // Get the tens digit of the hour in 12-hour format
+    }
+    else if (current_time.hour == 0) {
+        return '1'; // Midnight case
+    }
+    else {
+        return (current_time.hour / 10) + '0'; // Get the tens digit of the hour in 12-hour format
+    }
+}
+
+char clock_getHourOnes12(void)
+{
+    if (current_time.hour > 12) {
+        return ((current_time.hour - 12) % 10) + '0'; // Get the ones digit of the hour in 12-hour format
+    }
+    else if (current_time.hour == 0) {
+        return '2'; // Midnight case
+    }
+    else {
+        return (current_time.hour % 10) + '0'; // Get the ones digit of the hour in 12-hour format
+    }
+}
+
+char clock_getHourTens(void)
+{
+    return (current_time.hour / 10) + '0'; // Get the tens digit of the hour
+}
+
+char clock_getHourOnes(void)
+{
+    return (current_time.hour % 10) + '0'; // Get the ones digit of the hour
+}
+
+char clock_getMinuteTens(void)
+{
+    return (current_time.minute / 10) + '0'; // Get the tens digit of the minute
+}
+
+char clock_getMinuteOnes(void)
+{
+    return (current_time.minute % 10) + '0'; // Get the ones digit of the minute
 }
 
 static void add_seconds(clock_datetime_t* time, uint32_t seconds)
@@ -117,8 +161,6 @@ static void add_seconds(clock_datetime_t* time, uint32_t seconds)
 
 void clock_init(void)
 {
-    http_manager_init(); // Initialize HTTP manager
-
     gptimer_config_t config = {
         .clk_src = GPTIMER_CLK_SRC_DEFAULT,
         .direction = GPTIMER_COUNT_UP,
@@ -143,6 +185,11 @@ void clock_init(void)
 
     ESP_ERROR_CHECK(gptimer_enable(timer)); // Enable the timer
     ESP_ERROR_CHECK(gptimer_start(timer)); // Start the timer
+    
+    while (!http_manager_readyForDependencies()) // Wait for the IP address to be obtained
+    {
+        vTaskDelay(pdMS_TO_TICKS(5000)); // Wait for 5 second
+    }
 
 }
 
@@ -175,6 +222,5 @@ void clock_task(void* pvParameter)
     while (1)
     {
         vTaskDelay(pdMS_TO_TICKS(1000)); // Wait for 1 second
-        LOGI("Current time: %02lu:%02lu:%02lu", current_time.hour, current_time.minute, current_time.second);
     }
 }

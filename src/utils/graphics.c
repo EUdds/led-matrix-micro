@@ -17,7 +17,7 @@
 void graphics_drawChar(uint8_t x, uint8_t y, char c, font_size_E size, uint32_t color)
 {
     font_drawChar(x, y, c, size, color);
-    LOGI("Drawing character '%c' at (%d, %d) with size %d and color %06lX", c, x, y, size, color);
+    LOGD("Drawing character '%c' at (%d, %d) with size %d and color %06lX", c, x, y, size, color);
 }
 
 void graphics_drawRectangle(uint8_t x, uint8_t y, uint8_t width, uint8_t height, uint32_t color)

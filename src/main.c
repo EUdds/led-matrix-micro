@@ -9,13 +9,15 @@
 #include "utils.h"
 #include "graphics.h"
 #include "clock.h"
+#include "http_manager.h"
+#include "ota_manger.h"
 
 #define LED_PIN GPIO_NUM_2  // Built-in LED on most ESP32 dev boards
 
 void blinky_task(void *pvParameter) {
     // Configure the LED pin as output
     gpio_config_t io_conf = {
-        .intr_type = GPIO_INTR_DISABLE, // No interrupt
+        .intr_type = GPIO_INTR_NEGEDGE,
         .mode = GPIO_MODE_OUTPUT,       // Set as output mode
         .pin_bit_mask = (1ULL << LED_PIN), // Bit mask of the pin
         .pull_down_en = GPIO_PULLDOWN_DISABLE, // No pull-down
@@ -32,20 +34,14 @@ void blinky_task(void *pvParameter) {
 
 void app_main(void)
 {
-    xTaskCreate(&blinky_task, "blinky_task", 2048, NULL, 5, NULL);
+    xTaskCreate(&blinky_task, "blinky_task", 1024, NULL, 5, NULL);
     xTaskCreate(&neopixel_task, "neopixel_task", 4096, NULL, 5, NULL); 
     xTaskCreate(&hardware_task, "hardware_task", 4096, NULL, 5, NULL); // Create the hardware task
     xTaskCreate(&display_manager_task, "display_manager_task", 4096, NULL, 5, NULL); // Create the display manager task
-    xTaskCreate(&clock_task, "clock_task", 8192, NULL, 5, NULL); // Create the HTTP task
-    int headCol = 0;
-    int headRow = 0;
-    int prevHeadCol = 0;
-    int prevHeadRow = 0;
-    bool colDirection = true;
-    // display_manager_setPixel(0, 0, RED);
-    // display_manager_setPixel(0, 1, GREEN);
-    // display_manager_setPixel(0, 2, BLUE);
-    // graphics_drawChar(16, 2, '2', FONT_SIZE_5x3, 0xFF0000); // Draw the character in red
+    xTaskCreate(&clock_task, "clock_task", 4096, NULL, 5, NULL); // Create the HTTP task
+    xTaskCreate(&http_task, "http_task", 8192, NULL, 5, NULL); // Create the HTTP task
+    xTaskCreate(&ota_task, "ota_task", 8192, NULL, 5, NULL); // Create the OTA task
+    
     while(1)
     {
         // for (int x=0; x < NEOPIXEL_NUM_COLS - 3; x++)

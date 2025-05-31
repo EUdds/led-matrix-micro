@@ -2,10 +2,15 @@
 
 #include "neopixel_driver.h"
 #include "hardware.h"
+#include "graphics.h"
+#include "utils.h"
+#include "clock.h"
+#include "http_manager.h"
 
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_wifi.h"
 
 #include <stdint.h>
 
@@ -51,7 +56,7 @@ void display_manager_setPixel(uint32_t row, uint32_t col, uint32_t color)
             break;
     }
     neopixel_driver_setPixel(pixelIndex, color);
-    LOGI("Setting pixel at (%ld, %ld) to color %06lX (%lu)", row, col, color, pixelIndex);
+    LOGD("Setting pixel at (%ld, %ld) to color %06lX (%lu)", row, col, color, pixelIndex);
 }
 
 void display_manager_clearScreen(void)
@@ -61,8 +66,8 @@ void display_manager_clearScreen(void)
 
 void display_manager_task(void* pvParameter)
 {
-    // Initialize the display manager
-    display_manager_setBrightness(1.0f); // Set brightness to 100%
+    clock_datetime_t time = {0};
+    bool wifiStatusLedState = false;
 
     while (1) {
         if (enablePotMonitoring) {
@@ -74,6 +79,46 @@ void display_manager_task(void* pvParameter)
                     LOGI("Brightness Set: %.2f", potValue);
                     lastPotValue = potValue;
                 }
+        }
+        if (get_current_time12(&time)) { // You're not actually using the time here, but just for demonstration
+            // Display the time on the screen
+            graphics_drawChar(0, 0, clock_getHourTens12(), FONT_SIZE_5x3, 0xFF0000);
+            graphics_drawChar(3, 0, clock_getHourOnes12(), FONT_SIZE_5x3, 0x00FF00);
+            if (time.second % 2 == 0) {
+                display_manager_setPixel(1,6 , 0xFFFF00); // Draw the colon
+                display_manager_setPixel(3,6 , 0xFFFF00); // Draw the colon
+            } else {
+                display_manager_setPixel(1,6 , 0x000000); // Clear the colon
+                display_manager_setPixel(3,6 , 0x000000); // Clear the colon
+            }
+            graphics_drawChar(7, 0, clock_getMinuteTens(), FONT_SIZE_5x3, 0x0000FF);
+            graphics_drawChar(10, 0, clock_getMinuteOnes(), FONT_SIZE_5x3, 0xFFFF00); 
+
+        } else {
+            LOGD("Failed to get current time");
+        }
+
+        if (http_manager_getCurrentIPStatus() == IP_EVENT_STA_GOT_IP)
+        {
+            if (http_manager_isRequestInProgress())
+            {
+                wifiStatusLedState = !wifiStatusLedState;
+                uint32_t color = wifiStatusLedState ? GREEN : BLACK;
+                display_manager_setPixel(0, 31, color);
+            }
+            else
+            {
+                wifiStatusLedState = true;
+                display_manager_setPixel(0, 31, GREEN);
+            }
+        }
+        else if (http_manager_getCurrentWifiStatus() == WIFI_EVENT_STA_CONNECTED)
+        {
+            display_manager_setPixel(0, 31, YELLOW);
+        }
+        else
+        {
+            display_manager_setPixel(0, 31, RED);
         }
         vTaskDelay(pdMS_TO_TICKS(100)); // Wait for 100 ms
     }
