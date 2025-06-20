@@ -1,39 +1,66 @@
 #include "graphics.h"
-
-#include "display_manager.h"
-#include "fonts.h"
-
 #include "esp_log.h"
 #include <string.h>
 #include <stdbool.h>
+#include "telnet_log.h"
 
 #define TAG "GRAPHICS"
-#define LOGI(...) ESP_LOGI(TAG, __VA_ARGS__)
-#define LOGE(...) ESP_LOGE(TAG, __VA_ARGS__)
-#define LOGD(...) ESP_LOGD(TAG, __VA_ARGS__)
-#define LOGW(...) ESP_LOGW(TAG, __VA_ARGS__)
 
-
-void graphics_drawChar(uint8_t x, uint8_t y, char c, font_size_E size, uint32_t color)
-{
-    font_drawChar(x, y, c, size, color);
-    LOGD("Drawing character '%c' at (%d, %d) with size %d and color %06lX", c, x, y, size, color);
+// Helper function to check if coordinates are within buffer bounds
+static bool is_in_bounds(displayManager_buffer_t* buffer, uint8_t x, uint8_t y) {
+    return (buffer != NULL && 
+            x < buffer->width && 
+            y < buffer->height);
 }
 
-void graphics_drawRectangle(uint8_t x, uint8_t y, uint8_t width, uint8_t height, uint32_t color)
+void graphics_drawChar(displayManager_buffer_t* buffer,
+                      uint8_t x, uint8_t y,
+                      char c,
+                      font_size_E size,
+                      uint32_t color)
 {
-    for (uint8_t row = 0; row < height; row++)
-    {
-        for (uint8_t col = 0; col < width; col++)
-        {
-            display_manager_setPixel(y + row, x + col, color);
+    if (!buffer || !buffer->active) {
+        LOGE("Invalid or inactive buffer");
+        return;
+    }
+    LOGD("Drawing character '%c' at (%d, %d) with size %d and color %06lX", 
+         c, x, y, size, color);
+
+    font_drawChar(buffer, x, y, c, size, color);
+}
+
+void graphics_drawRectangle(displayManager_buffer_t* buffer,
+                          uint8_t x, uint8_t y,
+                          uint8_t width, uint8_t height,
+                          uint32_t color)
+{
+    if (!buffer || !buffer->active) {
+        LOGE("Invalid or inactive buffer");
+        return;
+    }
+
+    for (uint8_t row = 0; row < height; row++) {
+        for (uint8_t col = 0; col < width; col++) {
+            if (is_in_bounds(buffer, x + col, y + row)) {
+                display_manager_setBufferPixel(buffer, x + col, y + row, color);
+            }
         }
     }
-    LOGI("Drawing rectangle at (%d, %d) with width %d, height %d and color %06lX", x, y, width, height, color);
+
+    LOGI("Drawing rectangle in buffer '%s' at (%d, %d) with width %d, height %d", 
+         buffer->owner, x, y, width, height);
 }
 
-void graphics_drawLine(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint32_t color)
+void graphics_drawLine(displayManager_buffer_t* buffer,
+                      uint8_t x1, uint8_t y1,
+                      uint8_t x2, uint8_t y2,
+                      uint32_t color)
 {
+    if (!buffer || !buffer->active) {
+        LOGE("Invalid or inactive buffer");
+        return;
+    }
+
     // Bresenham's line algorithm
     int dx = abs(x2 - x1);
     int dy = abs(y2 - y1);
@@ -41,22 +68,24 @@ void graphics_drawLine(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint32_t 
     int sy = (y1 < y2) ? 1 : -1;
     int err = dx - dy;
 
-    while (true)
-    {
-        display_manager_setPixel(y1, x1, color); // Set pixel at (x1, y1)
+    while (true) {
+        if (is_in_bounds(buffer, x1, y1)) {
+            display_manager_setBufferPixel(buffer, x1, y1, color);
+        }
 
-        if (x1 == x2 && y1 == y2) break; // Line is complete
+        if (x1 == x2 && y1 == y2) break;
 
         int err2 = err * 2;
-        if (err2 > -dy)
-        {
+        if (err2 > -dy) {
             err -= dy;
             x1 += sx;
         }
-        if (err2 < dx)
-        {
+        if (err2 < dx) {
             err += dx;
             y1 += sy;
         }
     }
+
+    LOGI("Drawing line in buffer '%s' from (%d, %d) to (%d, %d)", 
+         buffer->owner, x1, y1, x2, y2);
 }

@@ -9,7 +9,7 @@
 #define LOGE(...) ESP_LOGE(LOGGER_TAG, __VA_ARGS__)
 #define LOGD(...) ESP_LOGD(LOGGER_TAG, __VA_ARGS__)
 #define LOGW(...) ESP_LOGW(LOGGER_TAG, __VA_ARGS__)
-#define LOGV(...) ESP_LOGV(LOGGER_TAG, __VA_ARGS__)
+
 
 
 #define POT_ADC_CHANNEL ADC1_CHANNEL_3 // VN pin

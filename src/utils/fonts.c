@@ -1,16 +1,13 @@
 #include "fonts.h"
+#include "telnet_log.h"
+#include "display_manager.h"
 
 #include <string.h>
 
 #include "5x3.h"
-#include "display_manager.h"
 
 #include "esp_log.h"
 #define TAG "FONT"
-#define LOGI(...) ESP_LOGI(TAG, __VA_ARGS__)
-#define LOGE(...) ESP_LOGE(TAG, __VA_ARGS__)
-#define LOGD(...) ESP_LOGD(TAG, __VA_ARGS__)
-#define LOGW(...) ESP_LOGW(TAG, __VA_ARGS__)
 
 
 const font_t font_5x3 = {
@@ -47,23 +44,36 @@ void font_getChar(char c, font_size_E size, uint8_t *bitmap, uint8_t *width, uin
     LOGD("Font: %d, Width: %d, Height: %d", size, *width, *height);
 }
 
-void font_drawChar(uint8_t x, uint8_t y, char c, font_size_E size, uint32_t color)
+void font_drawChar(displayManager_buffer_t* buffer, uint8_t x, uint8_t y,
+                  char c, font_size_E size, uint32_t color)
 {
-    uint8_t bitmap[FONT_5X3_WIDTH * FONT_5X3_HEIGHT] = {0};
-    uint8_t width = 0;
-    uint8_t height = 0;
+    if (!buffer || !buffer->active) {
+        LOGE("Invalid or inactive buffer");
+        return;
+    }
+
+    uint8_t bitmap[8];  // Temporary storage for character bitmap
+    uint8_t width, height;
+
+    // Get the character bitmap and dimensions
     font_getChar(c, size, bitmap, &width, &height);
-    for (uint8_t row = 0; row < height; row++)
-    {
+
+    // Check if character fits in the buffer
+    if (x + width > buffer->width || y + height > buffer->height) {
+        LOGE("Character '%c' does not fit in buffer at (%d, %d) with size (%d, %d)", 
+             c, x, y, width, height);
+        return;
+    }
+
+    // Draw the character pixel by pixel
+    for (uint8_t row = 0; row < height; row++) {
+        uint8_t line = bitmap[row];
         for (uint8_t col = 0; col < width; col++)
         {
-            if (bitmap[row] & (1 << col))
-            {
-                display_manager_setPixel(y + row, x + (width - col - 1),  color);
-            }
-            else
-            {
-                display_manager_setPixel(y + row, x + (width - col - 1), 0x000000); // Clear pixel
+            if (line & (1 << (width - 1 - col))) { // Check if pixel is set
+                display_manager_setBufferPixel(buffer, x + col, y + row, color);
+            } else {
+                display_manager_setBufferPixel(buffer, x + col, y + row, 0); // Clear pixel
             }
         }
     }

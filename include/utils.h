@@ -17,5 +17,6 @@
 #define ORANGE 0xFFA500
 #define PURPLE 0x800080
 #define PINK 0xFFC0CB
-#define BROWN 0xA52A2A
-#define GRAY 0x808080
+#define BROWN       0xA52A2A
+#define GRAY        0x808080
+#define TRANSPARENT 0xFFFFFFFF

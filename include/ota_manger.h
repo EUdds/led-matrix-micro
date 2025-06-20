@@ -17,3 +17,4 @@ void ota_manager_init(void);
 void ota_task(void* pvParameter);
 bool ota_manager_isUpdateInProgress(void);
 ota_manager_status_E ota_manager_getStatus(void);
+esp_err_t updater_register(void);

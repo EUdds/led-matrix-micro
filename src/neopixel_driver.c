@@ -7,6 +7,7 @@
 #include <neopixel.h>
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "telnet_log.h"
 #include "utils.h"
 
 #ifndef NEOPIXEL_GPIO
@@ -19,12 +20,7 @@
 
 #define QUEUE_BUFFER_SIZE (NEOPIXEL_NUM_LEDS * 3)
 
-#define LOGGER_TAG "NEOPIXEL_DRIVER"
-
-#define LOGI(...) ESP_LOGI(LOGGER_TAG, __VA_ARGS__)
-#define LOGE(...) ESP_LOGE(LOGGER_TAG, __VA_ARGS__)
-#define LOGD(...) ESP_LOGD(LOGGER_TAG, __VA_ARGS__)
-#define LOGW(...) ESP_LOGW(LOGGER_TAG, __VA_ARGS__)
+#define TAG "NEOPIXEL_DRIVER"
 
 
 #define BRIGHTNESS_SCALE 256
@@ -95,7 +91,7 @@ void neopixel_driver_setBrightness(float b)
         return;
     }
     brightness = b;
-    LOGD("Setting brightness to: %.2f", brightness);
+    // LOGD("Setting brightness to: %.2f", brightness);
 }
 
 void neopixel_driver_addToQueue(tNeopixel* pixel, uint32_t pixelCount)

@@ -1,6 +1,11 @@
 #include "clock.h"
 
 #include "http_manager.h"
+#include "telnet_log.h"
+#include "display_manager.h"
+#include "graphics.h"
+#include "fonts.h"
+#include "app_manager.h"
 
 #include "esp_log.h"
 #include "esp_err.h"
@@ -15,10 +20,6 @@
 #include <string.h>
 
 #define TAG "CLOCK"
-#define LOGI(...) ESP_LOGI(TAG, __VA_ARGS__)
-#define LOGE(...) ESP_LOGE(TAG, __VA_ARGS__)
-#define LOGD(...) ESP_LOGD(TAG, __VA_ARGS__)
-#define LOGW(...) ESP_LOGW(TAG, __VA_ARGS__)
 
 #define TIMER_DIVIDER 80 // 80 MHz / 80 = 1 MHz
 
@@ -26,6 +27,21 @@
 
 static clock_datetime_t current_time = {0};
 static gptimer_handle_t timer = NULL; // Timer handle
+static displayManager_buffer_t* clock_display_buffer = NULL;
+
+static app_manager_app_t clock_app =
+{
+    .name = "Clock",
+    .init_function = clock_init,
+    .task_function = clock_task,
+    .deinit_function = NULL, // No specific deinit function
+    .active = true,
+    .priority = 5,
+    .refresh_rate_ms = 1000, // Refresh every second
+    // .task_handle = NULL,
+    .stack_size = 4096,
+    .state = APP_STATE_STOPPED,
+};
 
 static void add_seconds(clock_datetime_t* time, uint32_t seconds);
 
@@ -159,7 +175,7 @@ static void add_seconds(clock_datetime_t* time, uint32_t seconds)
     }
 }
 
-void clock_init(void)
+bool clock_init(void)
 {
     gptimer_config_t config = {
         .clk_src = GPTIMER_CLK_SRC_DEFAULT,
@@ -185,18 +201,24 @@ void clock_init(void)
 
     ESP_ERROR_CHECK(gptimer_enable(timer)); // Enable the timer
     ESP_ERROR_CHECK(gptimer_start(timer)); // Start the timer
+
+    clock_display_buffer = display_manager_create_buffer("Clock",
+                                                        13, 7,
+                                                        0,  0,
+                                                        DISPLAY_MANAGER_LAYER_FOREGROUND);
+    
+    if (clock_display_buffer == NULL) {
+        LOGE("Failed to create clock display buffer");
+        while(1);
+        return false; // Buffer creation failed
+    }
     
     while (!http_manager_readyForDependencies()) // Wait for the IP address to be obtained
     {
         vTaskDelay(pdMS_TO_TICKS(5000)); // Wait for 5 second
     }
-
-}
-
-void clock_task(void* pvParameter)
-{
-    clock_init(); // Initialize the clock
-    for (int i = 0; i < 3; i++)
+    
+    for (int i = 0; i < 5; i++)
     {
         if (fetch_time(&current_time)) // Fetch the time from the server
         {
@@ -206,7 +228,7 @@ void clock_task(void* pvParameter)
         else
         {
             LOGE("Failed to fetch time, retrying in 5 seconds...");
-            vTaskDelay(pdMS_TO_TICKS(5000)); // Wait for 5 seconds before retrying
+            vTaskDelay(pdMS_TO_TICKS(1000)); // Wait for 1 second before retrying
         }
     }
     if (current_time.year == 0) // Check if the time was not fetched successfully
@@ -219,8 +241,32 @@ void clock_task(void* pvParameter)
         current_time.day = 1;
         current_time.year = 2023; // Default time
     }
+
+    return true;
+}
+
+void clock_task(void* pvParameter)
+{
     while (1)
     {
+        graphics_drawChar(clock_display_buffer, 0, 0, clock_getHourTens12(), FONT_SIZE_5x3, 0xFF0000);
+        graphics_drawChar(clock_display_buffer, 3, 0, clock_getHourOnes12(), FONT_SIZE_5x3, 0x00FF00);
+        if (current_time.second % 2 == 0) {
+            display_manager_setBufferPixel(clock_display_buffer, 6, 1, 0xFFFF00); // Draw the colon
+            display_manager_setBufferPixel(clock_display_buffer, 6, 3, 0xFFFF00); // Draw the colon
+        } else {
+            display_manager_setBufferPixel(clock_display_buffer, 6, 1, 0x000000); // Clear the colon
+            display_manager_setBufferPixel(clock_display_buffer, 6, 3, 0x000000); // Clear the colon
+        }
+        graphics_drawChar(clock_display_buffer, 7, 0, clock_getMinuteTens(), FONT_SIZE_5x3, 0x0000FF);
+        graphics_drawChar(clock_display_buffer, 10, 0, clock_getMinuteOnes(), FONT_SIZE_5x3, 0xFFFF00);
+
+
         vTaskDelay(pdMS_TO_TICKS(1000)); // Wait for 1 second
     }
+}
+
+esp_err_t clock_app_register(void)
+{
+    return app_manager_register_app(&clock_app); // Register the clock app with the app manager
 }
